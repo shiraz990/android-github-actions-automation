@@ -1,0 +1,21 @@
+name: PR Slack Notification
+
+# Trigger on PR opened, reopened, or merged
+on:
+  pull_request:
+    types: [opened, reopened, closed]
+
+jobs:
+  pr-notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Slack message
+        uses: slackapi/slack-github-action@v1.25.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          payload: |
+            {
+              "text": "${{ github.event.pull_request.user.login }} has ${{ github.event.action }} a Pull Request!\nTitle: *${{ github.event.pull_request.title }}*\nBranch: *${{ github.event.pull_request.head.ref }}*\nLink: ${{ github.event.pull_request.html_url }}"
+            }
