@@ -1,19 +1,37 @@
-name: Slack Test Notification
+name: Android Build
 
 on:
   push:
+    branches: [ "main" ]
+  pull_request:
 
 jobs:
-  notify:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Send Slack message
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build with Gradle
+        run: ./gradlew assembleDebug
+
+      - name: Notify Slack on failure
+        if: failure()
         uses: slackapi/slack-github-action@v1.25.0
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
           payload: |
             {
-              "text": "✅ Slack is connected!\nRepo: *${{ github.repository }}*\nBranch: *${{ github.ref_name }}*\nBy: *${{ github.actor }}*"
+              "text": "🚨 *Android Build Failed!*\nRepo: *${{ github.repository }}*\nBranch: *${{ github.ref_name }}*\nBy: *${{ github.actor }}*\nLogs: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             }
