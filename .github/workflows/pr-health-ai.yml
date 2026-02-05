@@ -14,49 +14,67 @@ jobs:
         env:
           HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
         run: |
-          PROMPT=$(cat << 'EOF'
-          You are a senior Android tech lead.
+          echo "Preparing AI prompt..."
 
-          Evaluate the health of this Pull Request.
+          # Set Bash variables
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_BODY="${{ github.event.pull_request.body }}"
+          FILES_CHANGED="${{ github.event.pull_request.changed_files }}"
+          ADDITIONS="${{ github.event.pull_request.additions }}"
+          DELETIONS="${{ github.event.pull_request.deletions }}"
 
-          Rules:
-          - If files changed > 15 → warning
-          - If additions + deletions > 500 → risky
-          - If description is empty → unhealthy
-          - Small focused PRs are healthy
+          # Use unquoted heredoc
+          PROMPT=$(cat << EOF
+You are a senior Android tech lead.
 
-          Respond ONLY in JSON:
-          {
-            "health": "green | yellow | red",
-            "summary": "short explanation",
-            "warnings": ["list of warnings"]
-          }
+Evaluate the health of this Pull Request.
 
-          PR Title: "${{ github.event.pull_request.title }}"
-          PR Description: "${{ github.event.pull_request.body }}"
-          Files changed: ${{ github.event.pull_request.changed_files }}
-          Additions: ${{ github.event.pull_request.additions }}
-          Deletions: ${{ github.event.pull_request.deletions }}
-          EOF
+Rules:
+- If files changed > 15 → warning
+- If additions + deletions > 500 → risky
+- If description is empty → unhealthy
+- Small focused PRs are healthy
+
+Respond ONLY in JSON:
+{
+  "health": "green | yellow | red",
+  "summary": "short explanation",
+  "warnings": ["list of warnings"]
+}
+
+PR Title: "$PR_TITLE"
+PR Description: "$PR_BODY"
+Files changed: $FILES_CHANGED
+Additions: $ADDITIONS
+Deletions: $DELETIONS
+EOF
           )
 
+          # Escape prompt for JSON safely
+          SAFE_PROMPT=$(jq -Rs . <<< "$PROMPT")
+
+          # Call Hugging Face API
           curl -s https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct \
             -H "Authorization: Bearer $HF_API_TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{\"inputs\": \"$PROMPT\"}" > ai_output.json
+            -d "{\"inputs\": $SAFE_PROMPT}" > ai_output.json
 
+          # Extract AI response
           AI_TEXT=$(cat ai_output.json | jq -r '.[0].generated_text')
 
+          # Save AI result as environment variable for next steps
           echo "AI_RESULT<<EOF" >> $GITHUB_ENV
           echo "$AI_TEXT" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
+          echo "AI analysis complete!"
+
       - name: Send PR Health to Slack
         uses: slackapi/slack-github-action@v1.25.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         with:
           payload: |
             {
               "text": "*🤖 PR Health Report*\n\n*Repo:* ${{ github.repository }}\n*PR:* ${{ github.event.pull_request.title }}\n*Author:* ${{ github.actor }}\n\n*AI Analysis:*\n```$AI_RESULT```"
             }
-        env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
