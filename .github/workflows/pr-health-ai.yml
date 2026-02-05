@@ -1,0 +1,46 @@
+name: PR Health (AI)
+
+on:
+  pull_request:
+    types: [opened]
+
+jobs:
+  pr-health:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Analyze PR health with AI
+        env:
+          HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
+        run: |
+          PROMPT=$(cat << 'EOF'
+          You are a senior Android tech lead.
+
+          Evaluate the health of this Pull Request using these rules:
+          - If files changed > 15 → warning
+          - If additions + deletions > 500 → risky
+          - If description is empty → unhealthy
+          - Small, focused PRs are healthy
+
+          Return ONLY this JSON format:
+          {
+            "health": "green | yellow | red",
+            "summary": "short explanation",
+            "warnings": ["list of warnings"]
+          }
+
+          PR Title: "${{ github.event.pull_request.title }}"
+          PR Description: "${{ github.event.pull_request.body }}"
+          Files changed: ${{ github.event.pull_request.changed_files }}
+          Additions: ${{ github.event.pull_request.additions }}
+          Deletions: ${{ github.event.pull_request.deletions }}
+          EOF
+          )
+
+          curl -s https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct \
+            -H "Authorization: Bearer $HF_API_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"inputs\": \"$PROMPT\"}" > ai_output.json
+
+          echo "AI OUTPUT:"
+          cat ai_output.json
