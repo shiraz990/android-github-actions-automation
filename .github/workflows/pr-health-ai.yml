@@ -1,4 +1,4 @@
-name: PR Health (AI - Free)
+name: PR Health (AI + Slack)
 
 on:
   pull_request:
@@ -9,22 +9,23 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Analyze PR health using free AI model
+      - name: Generate PR health using AI
+        id: ai
         env:
           HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
         run: |
-          echo "Preparing AI prompt..."
-
           PROMPT=$(cat << 'EOF'
           You are a senior Android tech lead.
 
-          Evaluate the health of this Pull Request using these rules:
+          Evaluate the health of this Pull Request.
+
+          Rules:
           - If files changed > 15 → warning
           - If additions + deletions > 500 → risky
           - If description is empty → unhealthy
-          - Small, focused PRs are healthy
+          - Small focused PRs are healthy
 
-          Respond ONLY in valid JSON format:
+          Respond ONLY in JSON:
           {
             "health": "green | yellow | red",
             "summary": "short explanation",
@@ -39,14 +40,23 @@ jobs:
           EOF
           )
 
-          echo "Calling Hugging Face Inference API..."
-
           curl -s https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct \
             -H "Authorization: Bearer $HF_API_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{\"inputs\": \"$PROMPT\"}" > ai_output.json
 
-          echo "================ AI RAW OUTPUT ================"
-          cat ai_output.json
-          echo ""
-          echo "================================================"
+          AI_TEXT=$(cat ai_output.json | jq -r '.[0].generated_text')
+
+          echo "AI_RESULT<<EOF" >> $GITHUB_ENV
+          echo "$AI_TEXT" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Send PR Health to Slack
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: |
+            {
+              "text": "*🤖 PR Health Report*\n\n*Repo:* ${{ github.repository }}\n*PR:* ${{ github.event.pull_request.title }}\n*Author:* ${{ github.actor }}\n\n*AI Analysis:*\n```$AI_RESULT```"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
