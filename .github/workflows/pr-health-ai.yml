@@ -1,4 +1,4 @@
-name: PR Health (AI)
+name: PR Health (AI - Free)
 
 on:
   pull_request:
@@ -9,10 +9,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Analyze PR health with AI
+      - name: Analyze PR health using free AI model
         env:
           HF_API_TOKEN: ${{ secrets.HF_API_TOKEN }}
         run: |
+          echo "Preparing AI prompt..."
+
           PROMPT=$(cat << 'EOF'
           You are a senior Android tech lead.
 
@@ -22,7 +24,7 @@ jobs:
           - If description is empty → unhealthy
           - Small, focused PRs are healthy
 
-          Return ONLY this JSON format:
+          Respond ONLY in valid JSON format:
           {
             "health": "green | yellow | red",
             "summary": "short explanation",
@@ -37,10 +39,14 @@ jobs:
           EOF
           )
 
-          curl -s https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct \
+          echo "Calling Hugging Face Inference API..."
+
+          curl -s https://router.huggingface.co/hf-inference/models/mistralai/Mistral-7B-Instruct \
             -H "Authorization: Bearer $HF_API_TOKEN" \
             -H "Content-Type: application/json" \
             -d "{\"inputs\": \"$PROMPT\"}" > ai_output.json
 
-          echo "AI OUTPUT:"
+          echo "================ AI RAW OUTPUT ================"
           cat ai_output.json
+          echo ""
+          echo "================================================"
