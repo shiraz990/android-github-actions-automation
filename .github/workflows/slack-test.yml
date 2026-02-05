@@ -1,0 +1,19 @@
+name: Slack Test Notification
+
+on:
+  push:
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Send Slack message
+        uses: slackapi/slack-github-action@v1.25.0
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        with:
+          payload: |
+            {
+              "text": "✅ Slack is connected!\nRepo: *${{ github.repository }}*\nBranch: *${{ github.ref_name }}*\nBy: *${{ github.actor }}*"
+            }
