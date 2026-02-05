@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.app.githubactionautomation"
-    compileSdk = 35
+    compileSdk = 1
 
     defaultConfig {
         applicationId = "com.app.githubactionautomation"
