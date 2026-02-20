@@ -29,7 +29,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-// Testing PR
+// Testing PR with AI
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
     Text(
